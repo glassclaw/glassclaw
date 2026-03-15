@@ -1,0 +1,327 @@
+{
+  "$id": "https://glassclaw.app/catalogs/glassclaw-free/v1/catalog.json",
+  "catalogId": "https://glassclaw.app/catalogs/glassclaw-free/v1/catalog.json",
+  "components": {
+    "Column": {
+      "type": "object",
+      "description": "Flex column container that stacks children vertically. Use for page layout, form sections, and any vertical arrangement of components.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs to render in this column"
+        },
+        "justify": {
+          "type": "string",
+          "description": "Flex justify-content value (e.g. 'start', 'center', 'end', 'space-between', 'space-around')"
+        },
+        "align": {
+          "type": "string",
+          "description": "Flex align-items value (e.g. 'start', 'center', 'end', 'stretch')"
+        }
+      },
+      "required": ["children"]
+    },
+    "Row": {
+      "type": "object",
+      "description": "Flex row container that arranges children horizontally. Use for side-by-side layouts, icon+text pairs, and toolbar-style arrangements.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs to render in this row"
+        },
+        "justify": {
+          "type": "string",
+          "description": "Flex justify-content value (e.g. 'start', 'center', 'end', 'space-between', 'space-around')"
+        },
+        "align": {
+          "type": "string",
+          "description": "Flex align-items value (e.g. 'start', 'center', 'end', 'stretch')"
+        }
+      },
+      "required": ["children"]
+    },
+    "Divider": {
+      "type": "object",
+      "description": "Visual separator line. Use to divide sections within a page.",
+      "properties": {
+        "axis": {
+          "type": "string",
+          "enum": ["horizontal", "vertical"],
+          "description": "Orientation of the divider line"
+        }
+      },
+      "required": []
+    },
+    "Text": {
+      "type": "object",
+      "description": "Text display component. Supports headings, body copy, and captions. Use 'variant' to control visual hierarchy.",
+      "properties": {
+        "text": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Text content to display, or a data binding path (e.g. {\"path\": \"/user/name\"})"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["h1", "h2", "h3", "body", "caption"],
+          "description": "Visual style variant. h1/h2/h3 for headings, body for standard text, caption for small secondary text"
+        }
+      },
+      "required": ["text"]
+    },
+    "Icon": {
+      "type": "object",
+      "description": "Renders a Material Symbols icon by name. Use for visual affordance alongside text or as standalone indicators.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Material Symbols icon name (e.g. 'check_circle', 'arrow_forward', 'person', 'star')"
+        }
+      },
+      "required": ["name"]
+    },
+    "Image": {
+      "type": "object",
+      "description": "Image display component. Renders an image from a URL with configurable object-fit behavior.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Fully qualified URL of the image to display"
+        },
+        "fit": {
+          "type": "string",
+          "enum": ["cover", "contain", "fill"],
+          "description": "CSS object-fit behavior: 'cover' crops to fill space, 'contain' letterboxes, 'fill' stretches"
+        }
+      },
+      "required": ["url"]
+    },
+    "GlassButton": {
+      "type": "object",
+      "description": "Tappable button with multiple style variants. Triggers server-side actions or client-side navigation. Use 'filled' for primary actions, 'outlined' for secondary, 'text' for tertiary.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Child component IDs rendered inside the button (typically a Text or Icon)"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["filled", "outlined", "text"],
+          "description": "Visual style: 'filled' = solid background (primary CTA), 'outlined' = border only, 'text' = no border"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to perform on tap. Use {name: string} for server events or {functionCall: {call: string, args: object}} for client-side navigation.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Server event name. The agent receives this event name when the button is tapped."
+                }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": {
+                      "type": "string",
+                      "description": "Client-side function name to invoke (e.g. 'navigate')"
+                    },
+                    "args": {
+                      "type": "object",
+                      "description": "Arguments to pass to the function"
+                    }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["children"]
+    },
+    "GlassNavigator": {
+      "type": "object",
+      "description": "Invisible tappable wrapper that makes any child component clickable. Use to make images, cards, or layout regions trigger navigation or actions.",
+      "properties": {
+        "child": {
+          "type": "string",
+          "description": "ID of the single child component to wrap"
+        },
+        "target": {
+          "type": "string",
+          "description": "Shorthand for navigation — surface ID to navigate to on tap"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to perform on tap. Use {name: string} for server events or {functionCall: {call: string, args: object}} for client-side navigation.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Server event name sent when the child is tapped"
+                }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": { "type": "string" },
+                    "args": { "type": "object" }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["child"]
+    },
+    "GlassCarousel": {
+      "type": "object",
+      "description": "Swipeable multi-page container with dot indicators. Use to present multiple screens or steps in a single mini-app. Each child is one full page.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs, one per carousel page"
+        }
+      },
+      "required": ["children"]
+    },
+    "GlassHeader": {
+      "type": "object",
+      "description": "Prominent page header with a title and optional subtitle. Typically placed at the top of a surface to give the page context.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Primary heading text"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Secondary text displayed below the title"
+        },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional action button component IDs (rendered right-aligned)"
+        }
+      },
+      "required": ["title"]
+    },
+    "GlassListItem": {
+      "type": "object",
+      "description": "List row component with leading avatar or icon, primary and secondary text, and optional trailing content. Use for contact lists, settings rows, feed items, and any repeated row patterns.",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "description": "Main label text for the list row"
+        },
+        "secondary": {
+          "type": "string",
+          "description": "Smaller supporting text displayed below the primary label"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Material Symbols icon name shown as the leading element (use instead of 'avatar')"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL of an image displayed as a circular avatar (use instead of 'icon')"
+        },
+        "trailing": {
+          "type": "string",
+          "description": "Short text shown at the trailing edge of the row (e.g. a timestamp, count, or status)"
+        },
+        "initials": {
+          "type": "string",
+          "description": "Fallback initials when no icon or avatar is set"
+        },
+        "badgeVariant": {
+          "type": "string",
+          "enum": ["success", "warning", "danger", "info", "neutral"],
+          "description": "Color variant for the trailing badge"
+        },
+        "chevron": {
+          "type": "boolean",
+          "description": "Show a right-pointing chevron indicating tappable"
+        },
+        "divider": {
+          "type": "boolean",
+          "description": "Show a bottom divider line"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to trigger when the row is tapped.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": { "type": "string" },
+                    "args": { "type": "object" }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["primary"]
+    },
+    "GlassBadge": {
+      "type": "object",
+      "description": "Compact status indicator pill. Use inline with other components to show status, severity, or categorization at a glance.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Short label text to display inside the badge (e.g. 'Active', 'Failed', 'New')"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["success", "warning", "danger", "info", "neutral"],
+          "description": "Color variant: 'success'=green, 'warning'=amber, 'danger'=red, 'info'=blue, 'neutral'=grey"
+        }
+      },
+      "required": ["text", "variant"]
+    }
+  }
+}
