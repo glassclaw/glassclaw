@@ -1,0 +1,892 @@
+{
+  "$id": "https://glassclaw.app/catalogs/glassclaw-pro/v1/catalog.json",
+  "catalogId": "https://glassclaw.app/catalogs/glassclaw-pro/v1/catalog.json",
+  "components": {
+    "Column": {
+      "type": "object",
+      "description": "Flex column container that stacks children vertically. Use for page layout, form sections, and any vertical arrangement of components.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs to render in this column"
+        },
+        "justify": {
+          "type": "string",
+          "description": "Flex justify-content value (e.g. 'start', 'center', 'end', 'space-between', 'space-around')"
+        },
+        "align": {
+          "type": "string",
+          "description": "Flex align-items value (e.g. 'start', 'center', 'end', 'stretch')"
+        }
+      },
+      "required": ["children"]
+    },
+    "Row": {
+      "type": "object",
+      "description": "Flex row container that arranges children horizontally. Use for side-by-side layouts, icon+text pairs, and toolbar-style arrangements.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs to render in this row"
+        },
+        "justify": {
+          "type": "string",
+          "description": "Flex justify-content value (e.g. 'start', 'center', 'end', 'space-between', 'space-around')"
+        },
+        "align": {
+          "type": "string",
+          "description": "Flex align-items value (e.g. 'start', 'center', 'end', 'stretch')"
+        }
+      },
+      "required": ["children"]
+    },
+    "Divider": {
+      "type": "object",
+      "description": "Visual separator line. Use to divide sections within a page.",
+      "properties": {
+        "axis": {
+          "type": "string",
+          "enum": ["horizontal", "vertical"],
+          "description": "Orientation of the divider line"
+        }
+      },
+      "required": []
+    },
+    "Text": {
+      "type": "object",
+      "description": "Text display component. Supports headings, body copy, and captions. Use 'variant' to control visual hierarchy.",
+      "properties": {
+        "text": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Text content to display, or a data binding path (e.g. {\"path\": \"/user/name\"})"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["h1", "h2", "h3", "body", "caption"],
+          "description": "Visual style variant. h1/h2/h3 for headings, body for standard text, caption for small secondary text"
+        }
+      },
+      "required": ["text"]
+    },
+    "Icon": {
+      "type": "object",
+      "description": "Renders a Material Symbols icon by name. Use for visual affordance alongside text or as standalone indicators.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Material Symbols icon name (e.g. 'check_circle', 'arrow_forward', 'person', 'star')"
+        }
+      },
+      "required": ["name"]
+    },
+    "Image": {
+      "type": "object",
+      "description": "Image display component. Renders an image from a URL with configurable object-fit behavior.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Fully qualified URL of the image to display"
+        },
+        "fit": {
+          "type": "string",
+          "enum": ["cover", "contain", "fill"],
+          "description": "CSS object-fit behavior: 'cover' crops to fill space, 'contain' letterboxes, 'fill' stretches"
+        }
+      },
+      "required": ["url"]
+    },
+    "GlassButton": {
+      "type": "object",
+      "description": "Tappable button with multiple style variants. Triggers server-side actions or client-side navigation. Use 'filled' for primary actions, 'outlined' for secondary, 'text' for tertiary.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Child component IDs rendered inside the button (typically a Text or Icon)"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["filled", "outlined", "text"],
+          "description": "Visual style: 'filled' = solid background (primary CTA), 'outlined' = border only, 'text' = no border"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to perform on tap. Use {name: string} for server events or {functionCall: {call: string, args: object}} for client-side navigation.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Server event name. The agent receives this event name when the button is tapped."
+                }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": {
+                      "type": "string",
+                      "description": "Client-side function name to invoke (e.g. 'navigate')"
+                    },
+                    "args": {
+                      "type": "object",
+                      "description": "Arguments to pass to the function"
+                    }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["children"]
+    },
+    "GlassNavigator": {
+      "type": "object",
+      "description": "Invisible tappable wrapper that makes any child component clickable. Use to make images, cards, or layout regions trigger navigation or actions.",
+      "properties": {
+        "child": {
+          "type": "string",
+          "description": "ID of the single child component to wrap"
+        },
+        "target": {
+          "type": "string",
+          "description": "Shorthand for navigation — surface ID to navigate to on tap"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to perform on tap. Use {name: string} for server events or {functionCall: {call: string, args: object}} for client-side navigation.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Server event name sent when the child is tapped"
+                }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": { "type": "string" },
+                    "args": { "type": "object" }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["child"]
+    },
+    "GlassCarousel": {
+      "type": "object",
+      "description": "Swipeable multi-page container with dot indicators. Use to present multiple screens or steps in a single mini-app. Each child is one full page.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs, one per carousel page"
+        }
+      },
+      "required": ["children"]
+    },
+    "GlassHeader": {
+      "type": "object",
+      "description": "Prominent page header with a title and optional subtitle. Typically placed at the top of a surface to give the page context.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Primary heading text"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Secondary text displayed below the title"
+        },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional action button component IDs (rendered right-aligned)"
+        }
+      },
+      "required": ["title"]
+    },
+    "GlassListItem": {
+      "type": "object",
+      "description": "List row component with leading avatar or icon, primary and secondary text, and optional trailing content. Use for contact lists, settings rows, feed items, and any repeated row patterns.",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "description": "Main label text for the list row"
+        },
+        "secondary": {
+          "type": "string",
+          "description": "Smaller supporting text displayed below the primary label"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Material Symbols icon name shown as the leading element (use instead of 'avatar')"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL of an image displayed as a circular avatar (use instead of 'icon')"
+        },
+        "trailing": {
+          "type": "string",
+          "description": "Short text shown at the trailing edge of the row (e.g. a timestamp, count, or status)"
+        },
+        "initials": {
+          "type": "string",
+          "description": "Fallback initials when no icon or avatar is set"
+        },
+        "badgeVariant": {
+          "type": "string",
+          "enum": ["success", "warning", "danger", "info", "neutral"],
+          "description": "Color variant for the trailing badge"
+        },
+        "chevron": {
+          "type": "boolean",
+          "description": "Show a right-pointing chevron indicating tappable"
+        },
+        "divider": {
+          "type": "boolean",
+          "description": "Show a bottom divider line"
+        },
+        "action": {
+          "type": "object",
+          "description": "Action to trigger when the row is tapped.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              },
+              "required": ["name"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "functionCall": {
+                  "type": "object",
+                  "properties": {
+                    "call": { "type": "string" },
+                    "args": { "type": "object" }
+                  },
+                  "required": ["call"]
+                }
+              },
+              "required": ["functionCall"]
+            }
+          ]
+        }
+      },
+      "required": ["primary"]
+    },
+    "GlassBadge": {
+      "type": "object",
+      "description": "Compact status indicator pill. Use inline with other components to show status, severity, or categorization at a glance.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Short label text to display inside the badge (e.g. 'Active', 'Failed', 'New')"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["success", "warning", "danger", "info", "neutral"],
+          "description": "Color variant: 'success'=green, 'warning'=amber, 'danger'=red, 'info'=blue, 'neutral'=grey"
+        }
+      },
+      "required": ["text", "variant"]
+    },
+    "GlassCard": {
+      "type": "object",
+      "description": "Structured content card with optional hero image, title, subtitle, and badge. Use to present a discrete entity (product, person, place, event) with rich visual content. Supports arbitrary child components in its body.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Child component IDs rendered in the card body, below the title/subtitle"
+        },
+        "image": {
+          "type": "string",
+          "description": "URL of a hero image displayed at the top of the card"
+        },
+        "title": {
+          "type": "string",
+          "description": "Primary heading text for the card"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Secondary text displayed below the title"
+        },
+        "badge": {
+          "type": "string",
+          "description": "Short label shown as a badge overlay on the card (e.g. 'New', 'Sale')"
+        }
+      },
+      "required": []
+    },
+    "GlassInput": {
+      "type": "object",
+      "description": "Single-line text input with a floating label. Supports data binding for pre-filling and reading values. Submitted form data is encrypted and relayed to the agent.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Floating label text shown above the input field"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial value string or data binding path (e.g. {\"path\": \"/form/name\"})"
+        },
+        "inputType": {
+          "type": "string",
+          "enum": ["text", "number", "email", "password", "tel", "url"],
+          "description": "HTML input type controlling keyboard mode and validation"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Placeholder text shown when the field is empty"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Helper text displayed below the field to guide the user"
+        },
+        "validationRegexp": {
+          "type": "string",
+          "description": "Regular expression pattern for client-side validation"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassTextarea": {
+      "type": "object",
+      "description": "Multi-line text input for longer free-form responses. Use when the expected input is more than one sentence.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Floating label text shown above the textarea"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial value string or data binding path"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Placeholder text shown when the field is empty"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Helper text displayed below the field"
+        },
+        "rows": {
+          "type": "number",
+          "description": "Number of visible text rows (default: 4)"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassSelect": {
+      "type": "object",
+      "description": "Dropdown select input. Use when the user must choose one option from a predefined list.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Floating label shown above the dropdown"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Currently selected option value or data binding path"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Display text for this option"
+              },
+              "value": {
+                "type": "string",
+                "description": "Submitted value for this option"
+              }
+            },
+            "required": ["label", "value"]
+          },
+          "description": "List of selectable options"
+        }
+      },
+      "required": ["label", "options"]
+    },
+    "GlassCheckbox": {
+      "type": "object",
+      "description": "Checkbox input with a label and optional description. Use for binary opt-in/opt-out choices (e.g. 'I agree to terms').",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Text label displayed next to the checkbox"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial checked state (true/false) or data binding path"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional explanatory text shown below the label"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassSwitch": {
+      "type": "object",
+      "description": "Toggle switch for binary on/off settings. Visually distinct from GlassCheckbox — prefer this for settings and feature toggles.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Text label describing what the switch controls"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial toggle state (true=on, false=off) or data binding path"
+        },
+        "description": {
+          "type": "string",
+          "description": "Helper text below the switch"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassRating": {
+      "type": "object",
+      "description": "Star rating input. Use to collect a numeric rating from the user on a 1-to-N scale.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Label describing what is being rated"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "number" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial rating value or data binding path"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum number of stars (default: 5)"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Helper text displayed below the rating stars"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassSlider": {
+      "type": "object",
+      "description": "Range slider input for selecting a numeric value between min and max. Use for quantities, percentages, or any continuous range.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Label describing what the slider controls"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "number" },
+            {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              },
+              "required": ["path"]
+            }
+          ],
+          "description": "Initial slider position or data binding path"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value of the slider range"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value of the slider range"
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment size between slider positions"
+        },
+        "suffix": {
+          "type": "string",
+          "description": "Unit label appended to the displayed value (e.g. '%', 'kg', 'km')"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Helper text displayed below the slider"
+        }
+      },
+      "required": ["label"]
+    },
+    "GlassStat": {
+      "type": "object",
+      "description": "Single KPI metric display with an optional trend indicator. Use in dashboard layouts to highlight one important number. Supports grid spanning via 'span'.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The metric value to display prominently (e.g. '1,234', '$9.99', '42%')"
+        },
+        "label": {
+          "type": "string",
+          "description": "Short description of what the metric measures (e.g. 'Monthly Revenue', 'Active Users')"
+        },
+        "trend": {
+          "type": "string",
+          "enum": ["up", "down", "neutral"],
+          "description": "Direction of the trend arrow indicator"
+        },
+        "delta": {
+          "type": "string",
+          "description": "Change value displayed alongside the trend arrow (e.g. '+12%', '-$4')"
+        },
+        "span": {
+          "type": "number",
+          "description": "Number of grid columns this tile spans in a GlassBento layout"
+        }
+      },
+      "required": ["value", "label"]
+    },
+    "GlassGauge": {
+      "type": "object",
+      "description": "Circular progress ring showing a value within a range. Use for capacity, completion percentage, or any bounded metric that benefits from a visual gauge.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Current numeric value to display on the gauge"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value of the gauge range"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value of the gauge range"
+        },
+        "label": {
+          "type": "string",
+          "description": "Text label displayed below the gauge (e.g. 'CPU Usage')"
+        },
+        "suffix": {
+          "type": "string",
+          "description": "Unit appended to the value inside the ring (e.g. '%', 'GB')"
+        },
+        "span": {
+          "type": "number",
+          "description": "Number of grid columns this tile spans in a GlassBento layout"
+        }
+      },
+      "required": ["value", "max"]
+    },
+    "GlassBarChart": {
+      "type": "object",
+      "description": "Horizontal bar chart for comparing values across categories. Use for rankings, comparisons, or any multi-item breakdown.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Category name for this bar"
+              },
+              "value": {
+                "type": "number",
+                "description": "Numeric value determining the bar length"
+              }
+            },
+            "required": ["label", "value"]
+          },
+          "description": "Data series for the chart, one object per bar"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Category name for this bar"
+              },
+              "value": {
+                "type": "number",
+                "description": "Numeric value determining the bar length"
+              }
+            },
+            "required": ["label", "value"]
+          },
+          "description": "Alias for items"
+        },
+        "label": {
+          "type": "string",
+          "description": "Chart title displayed above the bars"
+        },
+        "suffix": {
+          "type": "string",
+          "description": "Unit appended to each value label (e.g. '%', 'ms', 'users')"
+        }
+      },
+      "required": ["items"]
+    },
+    "GlassProgress": {
+      "type": "object",
+      "description": "Horizontal progress bar for showing a single value as a proportion of its maximum. Use for task completion, loading states, or quota usage.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Current progress value (0–100 unless max is specified separately)"
+        },
+        "label": {
+          "type": "string",
+          "description": "Text label describing what is being measured"
+        },
+        "suffix": {
+          "type": "string",
+          "description": "Unit appended to the displayed value (e.g. '%', '/100')"
+        }
+      },
+      "required": ["value"]
+    },
+    "GlassBento": {
+      "type": "object",
+      "description": "CSS Grid bento-box layout container. Arrange GlassStat, GlassGauge, and other dashboard tiles in a responsive grid. Child tiles can span multiple columns using their 'span' property.",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of child component IDs to place in the bento grid"
+        }
+      },
+      "required": ["children"]
+    },
+    "GlassCallout": {
+      "type": "object",
+      "description": "Alert or notice banner. Use to draw attention to important information, warnings, errors, or confirmations. Not dismissible — always visible on the surface.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Optional bold title above the text"
+        },
+        "text": {
+          "type": "string",
+          "description": "Message text displayed inside the callout"
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "danger"],
+          "description": "Color and icon variant: 'info'=blue, 'success'=green, 'warning'=amber, 'danger'=red"
+        }
+      },
+      "required": ["text", "variant"]
+    },
+    "GlassMap": {
+      "type": "object",
+      "description": "Embedded Google Maps view for a specific location. Use to show a place, venue, or address with optional metadata (distance, rating, hours).",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "description": "Latitude of the map center point"
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Longitude of the map center point"
+        },
+        "zoom": {
+          "type": "number",
+          "description": "Map zoom level (1=world, 15=street, 20=building)"
+        },
+        "label": {
+          "type": "string",
+          "description": "Place name or title displayed on the map card"
+        },
+        "address": {
+          "type": "string",
+          "description": "Street address displayed below the place name"
+        },
+        "distance": {
+          "type": "string",
+          "description": "Distance from user shown as metadata (e.g. '1.2 km')"
+        },
+        "rating": {
+          "type": "string",
+          "description": "Rating string shown as metadata (e.g. '4.5 stars')"
+        },
+        "hours": {
+          "type": "string",
+          "description": "Opening hours shown as metadata (e.g. 'Open until 22:00')"
+        }
+      },
+      "required": ["latitude", "longitude"]
+    },
+    "GlassTimeline": {
+      "type": "object",
+      "description": "Vertical timeline of ordered events or steps. Use for order tracking, process flows, activity history, or multi-step workflows.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Section heading displayed above the timeline"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Event or step name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Additional detail about this event"
+              },
+              "time": {
+                "type": "string",
+                "description": "Timestamp or relative time label (e.g. '2 hours ago', '14:32')"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["complete", "active", "pending"],
+                "description": "Visual state: 'complete'=filled icon, 'active'=highlighted current step, 'pending'=future step"
+              }
+            },
+            "required": ["title"]
+          },
+          "description": "Ordered list of timeline events from top (oldest/first) to bottom (newest/last)"
+        }
+      },
+      "required": ["items"]
+    },
+    "GlassTable": {
+      "type": "object",
+      "description": "Data table with column headers and rows. Use for structured tabular data such as transaction history, comparison tables, or records lists.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Table title displayed above the table"
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of column header strings"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "One row: an array of cell values in the same order as 'columns'"
+          },
+          "description": "Table data — each element is an array of cell strings for one row"
+        },
+        "striped": {
+          "type": "boolean",
+          "description": "Alternate row background colors for readability (default: false)"
+        }
+      },
+      "required": ["columns", "rows"]
+    },
+    "GlassCodeBlock": {
+      "type": "object",
+      "description": "Syntax-highlighted code display. Use to show code snippets, configuration files, or any monospaced content that benefits from syntax coloring.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "The code or text content to display"
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language for syntax highlighting (e.g. 'python', 'javascript', 'json', 'bash', 'sql')"
+        },
+        "label": {
+          "type": "string",
+          "description": "Optional caption or filename displayed above the code block"
+        }
+      },
+      "required": ["code"]
+    }
+  }
+}

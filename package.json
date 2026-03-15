@@ -1,0 +1,13 @@
+{
+  "name": "glassclaw-skill",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenClaw skill for Glass Claw — interactive cards for Telegram",
+  "scripts": {
+    "test": "node tests/unit.test.js"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.1.1",
+    "ajv": "^8.18.0"
+  }
+}
