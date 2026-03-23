@@ -22,7 +22,7 @@ const path = require('path');
 const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js');
 const { randomBytes }        = require('@noble/ciphers/utils.js');
 
-const SKILL_VERSION = 1;
+const SKILL_VERSION = 2;
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 // All config lives in ~/.glassclaw/glassclaw.json.
@@ -709,7 +709,7 @@ function validatePayload(payload) {
  * @param {object} params
  * @param {number}  params.chatId    — Telegram chat ID to send the button to
  * @param {number}  params.userId    — Telegram user ID (used for key lookup)
- * @param {string}  params.title     — Surface title
+ * @param {string}  params.title     — Button label shown in chat (not sent to server)
  * @param {string}  params.payload   — A2UI v0.9 JSONL payload
  * @param {boolean} [params.group]   — If true, send as plain JSONL (no encryption)
  * @returns {object} Surface creation response from Glass Claw API
@@ -730,7 +730,6 @@ async function create_card({ chatId, userId, title, payload, group = false }) {
     }
 
     const result = await glassclaw('POST', '/api/surfaces', {
-        title,
         payload: storedPayload,
     });
 
@@ -772,7 +771,6 @@ async function create_card({ chatId, userId, title, payload, group = false }) {
     // directly — they only work inside Telegram's mini-app viewer.
     return {
         id: result.id,
-        title: result.title,
         message: 'Card sent. Tell the user in one short sentence that the card is ready — do NOT describe its contents, list components, or share the URL.',
     };
 }
@@ -829,11 +827,10 @@ function _spawnResponseWatcher({ surfaceId, chatId, userId, messageId, group }) 
  * @param {string}  params.surfaceId  — Surface ID to update
  * @param {number}  params.userId     — Telegram user ID (used for key lookup)
  * @param {string}  params.payload    — New A2UI v0.9 JSONL payload
- * @param {string}  [params.title]    — New title (optional)
  * @param {boolean} [params.group]    — If true, send as plain JSONL (no encryption)
  * @returns {object} Surface update response from Glass Claw API
  */
-async function update_card({ surfaceId, userId, payload, title = '', group = false }) {
+async function update_card({ surfaceId, userId, payload, group = false }) {
     requireConfig();
     validatePayload(payload);
 
@@ -849,7 +846,6 @@ async function update_card({ surfaceId, userId, payload, title = '', group = fal
     }
 
     return glassclaw('PUT', `/api/surfaces/${surfaceId}`, {
-        title,
         payload: storedPayload,
     });
 }
