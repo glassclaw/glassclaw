@@ -22,7 +22,7 @@ const path = require('path');
 const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js');
 const { randomBytes }        = require('@noble/ciphers/utils.js');
 
-const SKILL_VERSION = 2;
+const SKILL_VERSION = 3;
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 // All config lives in ~/.glassclaw/glassclaw.json.
@@ -869,8 +869,26 @@ async function delete_card({ surfaceId }) {
 // ── Tool: poll_response ───────────────────────────────────────────────────────
 
 /**
+ * Single long-poll request. Returns { status, data } where:
+ *   - status: 'response' (200 with data), 'waiting' (204), 'gone' (404/410),
+ *             'rate_limited' (429), or 'error' (other)
+ *   - data:   raw response body on 'response', undefined otherwise
+ */
+async function _pollOnce(surfaceId) {
+    try {
+        const data = await glassclaw('GET', `/api/surfaces/${surfaceId}/response`);
+        if (data === null) return { status: 'waiting' };
+        return { status: 'response', data };
+    } catch (err) {
+        if (err.status === 404 || err.status === 410) return { status: 'gone' };
+        if (err.status === 429) return { status: 'rate_limited' };
+        return { status: 'error', message: err.message };
+    }
+}
+
+/**
  * Long-poll for an encrypted form response. Retries on 204 (no response yet).
- * Returns null when the surface expires (410) or when the timeout is reached.
+ * Returns null when the surface expires (404/410) or when the timeout is reached.
  *
  * @param {object} params
  * @param {string}  params.surfaceId  — Surface ID to poll
@@ -882,29 +900,27 @@ async function delete_card({ surfaceId }) {
 async function poll_response({ surfaceId, userId, group = false, timeout = 600 }) {
     requireConfig();
     const deadline = Date.now() + timeout * 1000;
+    const maxRetries = 25; // Hard backstop — never loop more than this
+    let retries = 0;
 
-    while (Date.now() < deadline) {
-        let data;
-        try {
-            data = await glassclaw('GET', `/api/surfaces/${surfaceId}/response`);
-        } catch (err) {
-            if (err.status === 410) return null;
-            if (err.status === 429) return null; // poll limit exceeded
-            // Server error — do NOT retry. Return null and let the user confirm manually.
-            return null;
-        }
+    while (Date.now() < deadline && retries < maxRetries) {
+        retries++;
+        const result = await _pollOnce(surfaceId);
 
-        // 204 — no response yet, server already held for up to 30s; retry.
-        if (data === null) continue;
+        if (result.status === 'gone') return null;
+        if (result.status === 'rate_limited') return null;
+        if (result.status === 'error') return null;
+        if (result.status === 'waiting') continue;
 
-        const plaintext = _decryptResponse(data.encrypted_data, surfaceId, userId, group);
+        // 'response' — decrypt and return.
+        const plaintext = _decryptResponse(result.data.encrypted_data, surfaceId, userId, group);
         return {
             data:       JSON.parse(plaintext),
-            created_at: data.created_at,
+            created_at: result.data.created_at,
         };
     }
 
-    // Timeout reached — no response received.
+    // Timeout or max retries reached — no response received.
     return null;
 }
 
@@ -1033,40 +1049,47 @@ async function _watchResponse({ surfaceId, chatId, userId, messageId, group = fa
 
     log(`START surfaceId=${surfaceId} chatId=${chatId} userId=${userId} messageId=${messageId} group=${group}`);
 
+    const maxIterations = 25; // Hard backstop — matches poll_response
     let iteration = 0;
-    while (true) {
+    let consecutiveErrors = 0;
+
+    while (iteration < maxIterations) {
         iteration++;
         log(`POLL #${iteration} — fetching ${BASE_URL}/api/surfaces/${surfaceId}/response`);
 
-        let data;
-        try {
-            data = await glassclaw('GET', `/api/surfaces/${surfaceId}/response`);
-        } catch (err) {
-            if (err.status === 410) {
-                log(`POLL #${iteration} — surface expired/deleted (410). Exiting.`);
+        const result = await _pollOnce(surfaceId);
+
+        switch (result.status) {
+        case 'gone':
+            log(`POLL #${iteration} — surface expired/deleted. Exiting.`);
+            return;
+        case 'rate_limited':
+            log(`POLL #${iteration} — poll limit exceeded (429). Sending reply keyboard.`);
+            await _handlePollLimitExceeded(chatId, userId, log, iteration);
+            return;
+        case 'error':
+            consecutiveErrors++;
+            log(`POLL #${iteration} — ERROR: ${result.message} (${consecutiveErrors}/3). Retrying in 5s.`);
+            if (consecutiveErrors >= 3) {
+                log(`POLL #${iteration} — 3 consecutive errors. Giving up.`);
                 return;
             }
-            if (err.status === 429) {
-                log(`POLL #${iteration} — poll limit exceeded (429). Sending reply keyboard.`);
-                await _handlePollLimitExceeded(chatId, userId, log, iteration);
-                return;
-            }
-            log(`POLL #${iteration} — ERROR: ${err.message}. Retrying in 5s.`);
             await new Promise(r => setTimeout(r, 5000));
             continue;
-        }
-
-        // 204 — no response yet.
-        if (data === null) {
+        case 'waiting':
+            consecutiveErrors = 0;
             log(`POLL #${iteration} — no response yet (204). Looping.`);
             continue;
+        case 'response':
+            break; // handle below
         }
 
         // 200 — response received. Decrypt it.
+        consecutiveErrors = 0;
         log(`POLL #${iteration} — RESPONSE RECEIVED. Decrypting.`);
         let plaintext;
         try {
-            plaintext = _decryptResponse(data.encrypted_data, surfaceId, userId, group);
+            plaintext = _decryptResponse(result.data.encrypted_data, surfaceId, userId, group);
         } catch (decErr) {
             log(`POLL #${iteration} — DECRYPT FAILED: ${decErr.message}. Exiting.`);
             return;
@@ -1090,6 +1113,8 @@ async function _watchResponse({ surfaceId, chatId, userId, messageId, group = fa
         _deliverToAgent(surfaceId, chatId, formData, log, iteration);
         return;
     }
+
+    log(`Max iterations (${maxIterations}) reached. Exiting.`);
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
@@ -1109,6 +1134,7 @@ module.exports = {
         loadKey, saveKey, loadGroupKey, saveGroupKey, deleteGroupKey,
         encrypt, decrypt, _decryptResponse,
         validatePayload, _validateComponent, _payloadHasForm,
+        _pollOnce,
     },
 };
 

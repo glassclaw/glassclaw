@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Unit tests for glassclaw.js — encryption, config, key storage, validation.
+ * Unit tests for glassclaw.js — encryption, config, key storage, validation, polling.
  *
  * Run from the skill root:
  *   cd skills/glassclaw
@@ -20,7 +20,7 @@ const {
     loadConfig, saveConfig, configGet, configSet,
     loadKey, saveKey, loadGroupKey, saveGroupKey, deleteGroupKey,
     encrypt, decrypt, _decryptResponse,
-    validatePayload, _payloadHasForm,
+    validatePayload, _payloadHasForm, _pollOnce,
 } = tool._internals;
 
 // Redirect config to a temp directory so tests never touch ~/.glassclaw.
@@ -47,6 +47,19 @@ function assertThrows(fn, msg) {
     let threw = false;
     try { fn(); } catch { threw = true; }
     assert(threw, msg);
+}
+
+function assertThrowsContaining(fn, substring, msg) {
+    let threw = false;
+    let errMsg = '';
+    try { fn(); } catch (e) { threw = true; errMsg = e.message; }
+    if (threw && errMsg.includes(substring)) {
+        passed++; console.log(`  ✓ ${msg}`);
+    } else if (!threw) {
+        failed++; console.error(`  ✗ ${msg}: did not throw`);
+    } else {
+        failed++; console.error(`  ✗ ${msg}: threw but message didn't contain ${JSON.stringify(substring)}, got: ${errMsg.substring(0, 200)}`);
+    }
 }
 
 function hexToBytes(hex) {
@@ -128,6 +141,12 @@ console.log('\n=== Large payload (60KB) ===');
     assertEqual(decrypt(encrypt(plaintext, keyHex), keyHex).length, 60000, 'large payload roundtrip');
 }
 
+console.log('\n=== Empty plaintext ===');
+{
+    const keyHex = bytesToHex(randomBytes(32));
+    assertEqual(decrypt(encrypt('', keyHex), keyHex), '', 'empty plaintext roundtrip');
+}
+
 console.log('\n=== _decryptResponse helper ===');
 {
     const keyHex = bytesToHex(randomBytes(32));
@@ -189,6 +208,8 @@ console.log('\n=== Key storage (config-based) ===');
     saveConfig(originalConfig);
 }
 
+// ── Validation: basic checks ─────────────────────────────────────────────
+
 console.log('\n=== Validation: valid payload ===');
 {
     const valid = '{"version":"v0.9","createSurface":{"surfaceId":"test"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"test","components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Hello"}]}}';
@@ -197,16 +218,68 @@ console.log('\n=== Validation: valid payload ===');
     assert(!threw, 'valid payload passes validation');
 }
 
+console.log('\n=== Validation: empty/null payload ===');
+{
+    assertThrows(() => validatePayload(null), 'rejects null payload');
+    assertThrows(() => validatePayload(''), 'rejects empty string payload');
+    assertThrows(() => validatePayload(42), 'rejects non-string payload');
+    assertThrows(() => validatePayload('   \n   \n   '), 'rejects whitespace-only payload');
+}
+
+console.log('\n=== Validation: invalid JSON line ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\nnot-valid-json';
+    assertThrowsContaining(() => validatePayload(bad), 'not valid JSON', 'rejects invalid JSON line');
+}
+
+console.log('\n=== Validation: missing version ===');
+{
+    const bad = '{"createSurface":{"surfaceId":"t"}}\n{"updateComponents":{"surfaceId":"t","components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Hello"}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'version', 'rejects missing version field');
+}
+
 console.log('\n=== Validation: missing createSurface ===');
 {
     const bad = '{"version":"v0.9","updateComponents":{"components":[]}}';
     assertThrows(() => validatePayload(bad), 'rejects missing createSurface');
 }
 
+console.log('\n=== Validation: missing updateComponents ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"test"}}';
+    assertThrowsContaining(() => validatePayload(bad), 'updateComponents', 'rejects missing updateComponents');
+}
+
+console.log('\n=== Validation: createSurface without matching updateComponents ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"page1"}}\n{"version":"v0.9","createSurface":{"surfaceId":"page2"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"page1","components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Hello"}]}}';
+    configSet('tier', 'pro'); // multi-surface requires pro
+    assertThrowsContaining(() => validatePayload(bad), 'page2', 'rejects surface with no updateComponents');
+    configSet('tier', 'free');
+}
+
+console.log('\n=== Validation: createSurface missing surfaceId ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{}}\n{"version":"v0.9","updateComponents":{"components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Hello"}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'surfaceId', 'rejects createSurface without surfaceId');
+}
+
 console.log('\n=== Validation: missing component id ===');
 {
     const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"component":"Text","text":"hi"}]}}';
     assertThrows(() => validatePayload(bad), 'rejects component without id');
+}
+
+console.log('\n=== Validation: missing component field ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"x"}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'component', 'rejects component without component field');
+}
+
+console.log('\n=== Validation: "type" instead of "component" ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"x","type":"Text","text":"hi"}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'type', 'rejects type instead of component');
 }
 
 console.log('\n=== Validation: unknown component ===');
@@ -221,11 +294,43 @@ console.log('\n=== Validation: nested children ===');
     assertThrows(() => validatePayload(bad), 'rejects nested children objects');
 }
 
+console.log('\n=== Validation: single child as object ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"nav","component":"GlassNavigator","child":{"id":"nested","component":"Text"},"action":{"functionCall":{"call":"navigateTo","args":{"surfaceId":"page2"}}}}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'child', 'rejects child as nested object');
+}
+
+console.log('\n=== Validation: missing child reference ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"root","component":"Column","children":["missing-child"]}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'missing-child', 'rejects reference to undefined component');
+}
+
 console.log('\n=== Validation: component ID collides with property value ===');
 {
     const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"root","component":"Column","children":["body"]},{"id":"body","component":"Text","text":"hi","variant":"body"}]}}';
     assertThrows(() => validatePayload(bad), 'rejects ID/property collision (body)');
 }
+
+console.log('\n=== Validation: component ID collides with data model key ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateDataModel":{"surfaceId":"t","path":"/","value":{"name":"test"}}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"root","component":"Column","children":["name"]},{"id":"name","component":"GlassInput","label":"Name","value":{"path":"/name"}}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'collide', 'rejects component ID / data model key collision');
+}
+
+console.log('\n=== Validation: form components without data model ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"root","component":"Column","children":["inp"]},{"id":"inp","component":"GlassInput","label":"Name","value":{"path":"/name"}}]}}';
+    assertThrowsContaining(() => validatePayload(bad), 'updateDataModel', 'rejects form inputs without data model');
+}
+
+console.log('\n=== Validation: components not an array ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":"not-an-array"}}';
+    assertThrowsContaining(() => validatePayload(bad), 'array', 'rejects components as non-array');
+}
+
+// ── Catalog validation ───────────────────────────────────────────────────
 
 console.log('\n=== Catalog validation: unknown property ===');
 {
@@ -243,6 +348,12 @@ console.log('\n=== Catalog validation: literalString wrapper ===');
 {
     const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"hdr","component":"GlassHeader","title":{"literalString":"Hello"}}]}}';
     assertThrows(() => validatePayload(bad), 'rejects literalString wrapper');
+}
+
+console.log('\n=== Catalog validation: type mismatch ===');
+{
+    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"g","component":"GlassGauge","value":"not-a-number","label":"CPU"}]}}';
+    assertThrows(() => validatePayload(bad), 'rejects string where number expected (GlassGauge value)');
 }
 
 console.log('\n=== Catalog validation: valid complex payload ===');
@@ -267,6 +378,8 @@ console.log('\n=== Catalog validation: valid complex payload ===');
     assert(!threw, 'complex valid payload passes all catalog checks');
     configSet('tier', 'free'); // reset
 }
+
+// ── Tier gating ──────────────────────────────────────────────────────────
 
 console.log('\n=== Tier gating: free tier rejects premium components ===');
 {
@@ -293,22 +406,58 @@ console.log('\n=== Tier gating: pro tier allows premium components ===');
     configSet('tier', 'free'); // reset
 }
 
-console.log('\n=== Catalog validation: type mismatch ===');
+console.log('\n=== Tier gating: free tier rejects multi-surface ===');
 {
-    const bad = '{"version":"v0.9","createSurface":{"surfaceId":"t"}}\n{"version":"v0.9","updateComponents":{"surfaceId":"t","components":[{"id":"g","component":"GlassGauge","value":"not-a-number","label":"CPU"}]}}';
-    assertThrows(() => validatePayload(bad), 'rejects string where number expected (GlassGauge value)');
+    configSet('tier', 'free');
+    const payload = [
+        '{"version":"v0.9","createSurface":{"surfaceId":"page1"}}',
+        '{"version":"v0.9","createSurface":{"surfaceId":"page2"}}',
+        '{"version":"v0.9","updateComponents":{"surfaceId":"page1","components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Page 1"}]}}',
+        '{"version":"v0.9","updateComponents":{"surfaceId":"page2","components":[{"id":"root2","component":"Column","children":["hdr2"]},{"id":"hdr2","component":"GlassHeader","title":"Page 2"}]}}',
+    ].join('\n');
+    assertThrowsContaining(() => validatePayload(payload), 'multi-page', 'rejects multi-surface on free tier');
 }
+
+console.log('\n=== Tier gating: pro tier allows multi-surface ===');
+{
+    configSet('tier', 'pro');
+    const payload = [
+        '{"version":"v0.9","createSurface":{"surfaceId":"page1"}}',
+        '{"version":"v0.9","createSurface":{"surfaceId":"page2"}}',
+        '{"version":"v0.9","updateComponents":{"surfaceId":"page1","components":[{"id":"root","component":"Column","children":["hdr"]},{"id":"hdr","component":"GlassHeader","title":"Page 1"}]}}',
+        '{"version":"v0.9","updateComponents":{"surfaceId":"page2","components":[{"id":"root2","component":"Column","children":["hdr2"]},{"id":"hdr2","component":"GlassHeader","title":"Page 2"}]}}',
+    ].join('\n');
+    let threw = false;
+    try { validatePayload(payload); } catch { threw = true; }
+    assert(!threw, 'allows multi-surface on pro tier');
+    configSet('tier', 'free'); // reset
+}
+
+// ── _payloadHasForm ──────────────────────────────────────────────────────
 
 console.log('\n=== _payloadHasForm ===');
 {
     const withForm = '{"version":"v0.9","updateComponents":{"components":[{"id":"btn","component":"GlassButton","action":{"name":"submit"}}]}}';
     const withoutForm = '{"version":"v0.9","updateComponents":{"components":[{"id":"btn","component":"GlassButton","action":{"functionCall":{"call":"navigateTo"}}}]}}';
     const noButton = '{"version":"v0.9","updateComponents":{"components":[{"id":"hdr","component":"GlassHeader","title":"Hi"}]}}';
+    const noComponents = '{"version":"v0.9","createSurface":{"surfaceId":"test"}}';
 
     assert(_payloadHasForm(withForm), 'detects form with action name');
     assert(!_payloadHasForm(withoutForm), 'ignores navigation buttons');
     assert(!_payloadHasForm(noButton), 'returns false when no button');
+    assert(!_payloadHasForm(noComponents), 'returns false when no updateComponents');
 }
+
+// ── _pollOnce ────────────────────────────────────────────────────────────
+
+console.log('\n=== _pollOnce: status mapping ===');
+{
+    // _pollOnce calls glassclaw() which requires config — we test by verifying
+    // the function exists and is properly exported.
+    assert(typeof _pollOnce === 'function', '_pollOnce is exported as a function');
+}
+
+// ── Module exports ───────────────────────────────────────────────────────
 
 console.log('\n=== Module exports ===');
 {
@@ -318,7 +467,9 @@ console.log('\n=== Module exports ===');
     assert(typeof tool.delete_card === 'function', 'exports delete_card');
     assert(typeof tool.poll_response === 'function', 'exports poll_response');
     assert(typeof tool.get_account === 'function', 'exports get_account');
+    assert(typeof tool.show_pro_demo === 'function', 'exports show_pro_demo');
     assert(typeof tool._internals === 'object', 'exports _internals for testing');
+    assert(typeof tool._internals._pollOnce === 'function', 'exports _pollOnce for testing');
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────
